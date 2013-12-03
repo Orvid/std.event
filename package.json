@@ -5,4 +5,5 @@
 	"license": "public domain",
 	"copyright": "Copyright © 2013, Orvid King",
 	"authors": ["Orvid King"],
+	"mainSourceFile": "source/event.d",
 }
