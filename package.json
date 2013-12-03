@@ -1,0 +1,8 @@
+{
+	"name": "std.event",
+	"targetType": "sourceLibrary",
+	"description": "A .Net inspired event library implementation for D.",
+	"license": "public domain",
+	"copyright": "Copyright © 2013, Orvid King",
+	"authors": ["Orvid King"],
+}
