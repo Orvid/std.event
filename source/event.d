@@ -1,52 +1,6 @@
 module std.event;
 
-import std.traits : isCallable, isDelegate;
-
-private template FunctionForDelegate(alias D)
-	if (isDelegate!D)
-{
-	import std.conv : to;
-	import std.traits : 
-		functionLinkage,
-		ParameterDefaultValueTuple,
-		ParameterIdentifierTuple,
-		ParameterStorageClass,
-		ParameterStorageClassTuple,
-		ParameterTypeTuple,
-		ReturnType
-	;
-
-	private static string generateType(alias D)()
-	{
-		string str = `alias `;
-		str ~= `extern(` ~ functionLinkage!D ~ `) `;
-		str ~= `ReturnType!D function(`;
-		alias paramDefaults = ParameterDefaultValueTuple!D;
-		alias paramIDs = ParameterIdentifierTuple!D;
-		alias paramStorageTypes = ParameterStorageClassTuple!D;
-		alias paramTypes = ParameterTypeTuple!D;
-		foreach (i, pt; paramTypes)
-		{
-			if (i != 0)
-				str ~= ", ";
-			if (paramStorageTypes[i] != ParameterStorageClass.none)
-				str ~= to!string(paramStorageTypes[i])[0..$ - 1] ~ " ";
-			str ~= pt.stringof ~ " ";
-			static if (paramIDs[i] != "")
-				str ~= paramIDs[i];
-			else
-				str ~= "param" ~ to!string(i);
-			if (!is(paramDefaults[i] == void))
-				str ~= ` = ` ~ paramDefaults[i].stringof;
-		}
-		str ~= `) FunctionForDelegate;`;
-		return str;
-	}
-
-	static assert(0, generateType!D());
-	mixin(generateType!D());
-	//mixin(`alias extern(` ~ functionLinkage!D ~ `) ReturnType!D function(ParameterTypeTuple!D) FunctionForDelegate;`);
-}
+import std.traits : isCallable;
 
 struct Event(D, bool allowDuplicates = false, bool synchronizedAccess = true)
 	if (isCallable!D)
@@ -79,9 +33,9 @@ struct Event(D, bool allowDuplicates = false, bool synchronizedAccess = true)
 	// operator for append operations is ~=, so this
 	// directs them to use that instead. This may very
 	// well be removed soon.
-	deprecated void opOpAssign(string op : "+")(D value)
+	deprecated("You should be using ~= rather than += to subscribe to a callback.") void opOpAssign(string op : "+")(D value)
 	{
-		static assert(0, "You should be using ~= rather than += to subscribe a callback!");
+		this ~= value;
 	}
 	
 	void opOpAssign(string op : "~", C)(C value)
