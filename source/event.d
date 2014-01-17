@@ -1,14 +1,37 @@
 module std.event;
 
-import std.traits : isCallable;
+import std.traits : isCallable, isDelegate;
 
-struct Event(D, bool allowDuplicates = false, bool synchronizedAccess = true)
-	if (isCallable!D)
+struct Event(OPTS...)
+	if (OPTS.length >= 1 && OPTS.length <= 3 && isCallable!(OPTS[0]))
 {
 	import std.functional : toDelegate;
 	import std.traits : ParameterTypeTuple;
 
-	private D[] subscribedCallbacks;
+	static if (OPTS.length >= 2)
+	{
+		static if (!is(typeof(OPTS[1]) == bool))
+			static assert(0, "Expected a bool representing whether to allow duplicates!");
+		public enum allowDuplicates = OPTS[1];
+	}
+	else
+		public enum allowDuplicates = false;
+
+	static if (OPTS.length >= 3)
+	{
+		static if (!is(typeof(OPTS[2]) == bool))
+			static assert(0, "Expected a bool representing whether to synchronize access!");
+		public enum synchronizedAccess = OPTS[2];
+	}
+	else
+		public enum synchronizedAccess = false;
+
+	static if (isDelegate!(OPTS[0]) || isFunction!(OPTS[0]))
+		public alias DelegateType = OPTS[0];
+	else
+		public alias DelegateType = typeof(&OPTS[0]);
+
+	private DelegateType[] subscribedCallbacks;
 	
 	static if (synchronizedAccess)
 		private Object lock = new Object();
@@ -25,15 +48,13 @@ struct Event(D, bool allowDuplicates = false, bool synchronizedAccess = true)
 			return d();
 	}
 	
-	public alias DelegateType = D;
-	
 	// This is only here because this event system is
 	// designed on the C# event model, which utilizes
 	// += to append a handler to an event, and the D 
 	// operator for append operations is ~=, so this
 	// directs them to use that instead. This may very
 	// well be removed soon.
-	deprecated("You should be using ~= rather than += to subscribe to a callback.") void opOpAssign(string op : "+")(D value)
+	deprecated("You should be using ~= rather than += to subscribe a callback!") void opOpAssign(string op : "+")(D value)
 	{
 		this ~= value;
 	}
@@ -43,7 +64,7 @@ struct Event(D, bool allowDuplicates = false, bool synchronizedAccess = true)
 	{
 		this ~= toDelegate(value);
 	}
-	void opOpAssign(string op : "~")(D value)
+	void opOpAssign(string op : "~")(DelegateType value)
 	{
 		MaybeSynchronous({
 			import std.algorithm : canFind;
@@ -60,7 +81,7 @@ struct Event(D, bool allowDuplicates = false, bool synchronizedAccess = true)
 	{
 		this -= toDelegate(value);
 	}
-	void opOpAssign(string op : "-")(D value)
+	void opOpAssign(string op : "-")(DelegateType value)
 	{
 		MaybeSynchronous({
 			import std.algorithm : countUntil, remove;
@@ -72,13 +93,13 @@ struct Event(D, bool allowDuplicates = false, bool synchronizedAccess = true)
 		});
 	}
 	
-	private static void rethrowExceptionHandler(D invokedCallback, Exception exceptionThrown) { throw exceptionThrown; }
-	auto opCall(ParameterTypeTuple!D args, void delegate(D, Exception) exceptionHandler = toDelegate(&rethrowExceptionHandler))
+	private static void rethrowExceptionHandler(DelegateType invokedCallback, Exception exceptionThrown) { throw exceptionThrown; }
+	auto opCall(ParameterTypeTuple!DelegateType args, void delegate(DelegateType, Exception) exceptionHandler = toDelegate(&rethrowExceptionHandler))
 	{
 		return MaybeSynchronous({
 			import std.traits : ReturnType;
 			
-			static if (is(ReturnType!D == void))
+			static if (is(ReturnType!DelegateType == void))
 			{
 				foreach (callback; subscribedCallbacks)
 				{
@@ -94,7 +115,7 @@ struct Event(D, bool allowDuplicates = false, bool synchronizedAccess = true)
 			}
 			else
 			{
-				ReturnType!D[] retVals;
+				ReturnType!DelegateType[] retVals;
 				
 				foreach (callback; subscribedCallbacks)
 				{
